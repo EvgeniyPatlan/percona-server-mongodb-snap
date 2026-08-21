@@ -159,14 +159,15 @@ parts:
   packages-deb:
     plugin: nil
     stage-packages:
-      - percona-server-mongodb=8.0.29-13.noble
       - percona-server-mongodb-server=8.0.29-13.noble
       - percona-server-mongodb-tools=8.0.29-13.noble
       - percona-server-mongodb-mongos=8.0.29-13.noble
+      - percona-server-mongodb-shell=8.0.29-13.noble
       - percona-mongodb-mongosh=2.10.0.noble
       - percona-backup-mongodb=2.15.0-1.noble
       - util-linux
       - libsasl2-modules
+      - libsasl2-modules-gssapi-mit
       - libgssapi-krb5-2
       - openssl
     override-prime: |
@@ -176,14 +177,14 @@ parts:
       zcat $CRAFT_PRIME/$LICENSE_LOC/LICENSE-Community.txt.gz \
         > $CRAFT_PRIME/licenses/LICENSE-percona-server-mongodb
     organize:
-      usr/share/doc/percona-server-mongodb/copyright: licenses/COPYRIGHT-percona-server-mongodb
       usr/share/doc/percona-server-mongodb-server/copyright: licenses/COPYRIGHT-percona-server-mongodb-server
       usr/share/doc/percona-server-mongodb-tools/copyright: licenses/COPYRIGHT-percona-server-mongodb-tools
       usr/share/doc/percona-server-mongodb-mongos/copyright: licenses/COPYRIGHT-percona-server-mongodb-mongos
+      usr/share/doc/percona-server-mongodb-shell/copyright: licenses/COPYRIGHT-percona-server-mongodb-shell
       usr/share/doc/percona-mongodb-mongosh/copyright: licenses/COPYRIGHT-percona-mongodb-mongosh
       usr/share/doc/percona-backup-mongodb/copyright: licenses/COPYRIGHT-percona-backup-mongodb
       usr/share/doc/util-linux/copyright: licenses/COPYRIGHT-util-linux
-      # libsasl2-modules, libgssapi-krb5-2, openssl may not ship copyright files in all versions
+      # libsasl2-modules, libsasl2-modules-gssapi-mit, libgssapi-krb5-2, openssl may not ship copyright files in all versions
     prime:
       # Percona telemetry agent (pulled in as hard dependency; not shipped)
       - -usr/bin/percona-telemetry-agent
