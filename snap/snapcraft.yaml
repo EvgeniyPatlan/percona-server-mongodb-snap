@@ -1,0 +1,213 @@
+name: percona-server-mongodb
+title: Percona Server for MongoDB
+base: core24
+version: '8.0.29-13'
+summary: Percona Server for MongoDB server and tools in a snap.
+description: |
+  Percona Server for MongoDB is a source-available, enhanced drop-in
+  replacement for MongoDB Community Edition, with enterprise-grade
+  features from Percona. This snap bundles the server, the mongos
+  sharding router, MongoDB Shell (mongosh), the legacy mongo shell, the
+  database tools, and Percona Backup for MongoDB (PBM).
+
+  On install the snap starts mongod as a standalone server on
+  127.0.0.1:27017; connect immediately with:
+    percona-server-mongodb.mongosh
+
+  Config lives at /var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf
+  (extra flags: `sudo snap set percona-server-mongodb mongod-args="..."`).
+  To form a replica set: run `sudo percona-server-mongodb.set-keyfile`,
+  uncomment the security/replication sections in mongod.conf, then
+  `sudo snap restart percona-server-mongodb.mongod` and initiate with
+  `percona-server-mongodb.mongosh --eval 'rs.initiate()'`.
+
+  Optional services (disabled by default, start with `snap start`):
+    .mongos — sharding query router on 127.0.0.1:27018; set
+      sharding.configDB in
+      /var/snap/percona-server-mongodb/current/etc/mongos/mongos.conf first.
+    .pbm-agent — Percona Backup for MongoDB agent; requires a replica set
+      and `sudo snap set percona-server-mongodb pbm-uri="mongodb://..."`,
+      then configure storage with `percona-server-mongodb.pbm config`.
+
+  Input files for the CLI tools must live under
+  /var/snap/percona-server-mongodb/common (the snap cannot read your home
+  directory). The Percona telemetry agent is not shipped and server-side
+  telemetry is disabled by default.
+
+contact: https://github.com/EvgeniyPatlan/percona-server-mongodb-snap/issues
+issues: https://github.com/EvgeniyPatlan/percona-server-mongodb-snap/issues
+source-code: https://github.com/EvgeniyPatlan/percona-server-mongodb-snap
+website: https://www.percona.com/mongodb/software/percona-server-for-mongodb
+
+grade: stable
+confinement: strict
+license: Apache-2.0
+platforms:
+  amd64:
+  arm64:
+
+system-usernames:
+  snap_daemon: shared
+
+hooks:
+  install:
+    plugs:
+      - network
+      - network-bind
+  configure: {}
+
+package-repositories:
+  - type: apt
+    url: https://repo.percona.com/psmdb-80/apt
+    suites: [noble]
+    components: [main]
+    key-id: 4D1BB29D63D98E422B2113B19334A25F8507EFA5
+  - type: apt
+    url: https://repo.percona.com/pbm/apt
+    suites: [noble]
+    components: [main]
+    key-id: 4D1BB29D63D98E422B2113B19334A25F8507EFA5
+  # Needed only because percona-server-mongodb depends on
+  # percona-telemetry-agent; the agent is pruned below.
+  - type: apt
+    url: https://repo.percona.com/telemetry/apt
+    suites: [noble]
+    components: [main]
+    key-id: 4D1BB29D63D98E422B2113B19334A25F8507EFA5
+
+apps:
+  mongod:
+    command: bin/start-mongod.sh
+    daemon: simple
+    stop-timeout: 5m
+    plugs:
+      - network
+      - network-bind
+  mongos:
+    command: bin/start-mongos.sh
+    daemon: simple
+    install-mode: disable
+    plugs:
+      - network
+      - network-bind
+  pbm-agent:
+    command: bin/start-pbm-agent.sh
+    daemon: simple
+    install-mode: disable
+    plugs:
+      - network
+      - network-bind
+  mongosh:
+    command: bin/drop_priv.sh mongosh
+    plugs:
+      - network
+      - system-observe
+    environment:
+      HOME: $SNAP_DATA/home
+      XDG_CACHE_HOME: $SNAP_DATA/home/.cache
+      XDG_CONFIG_HOME: $SNAP_DATA/home/.config
+  mongo:
+    command: bin/drop_priv.sh mongo
+    plugs:
+      - network
+  pbm:
+    command: bin/drop_priv.sh pbm
+    plugs:
+      - network
+  mongodump:
+    command: bin/drop_priv.sh mongodump
+    plugs:
+      - network
+  mongorestore:
+    command: bin/drop_priv.sh mongorestore
+    plugs:
+      - network
+  mongoexport:
+    command: bin/drop_priv.sh mongoexport
+    plugs:
+      - network
+  mongoimport:
+    command: bin/drop_priv.sh mongoimport
+    plugs:
+      - network
+  mongostat:
+    command: bin/drop_priv.sh mongostat
+    plugs:
+      - network
+  mongotop:
+    command: bin/drop_priv.sh mongotop
+    plugs:
+      - network
+  mongofiles:
+    command: bin/drop_priv.sh mongofiles
+    plugs:
+      - network
+  bsondump:
+    command: bin/drop_priv.sh bsondump
+    plugs:
+      - network
+  get-keyfile:
+    command: bin/get-keyfile.sh
+    plugs:
+      - network
+  set-keyfile:
+    command: bin/set-keyfile.sh
+    plugs:
+      - network
+
+parts:
+  packages-deb:
+    plugin: nil
+    stage-packages:
+      - percona-server-mongodb=8.0.29-13.noble
+      - percona-server-mongodb-server=8.0.29-13.noble
+      - percona-server-mongodb-tools=8.0.29-13.noble
+      - percona-server-mongodb-mongos=8.0.29-13.noble
+      - percona-mongodb-mongosh=8.0.29.noble
+      - percona-backup-mongodb=2.15.0-1.noble
+      - util-linux
+      - libsasl2-modules
+      - libgssapi-krb5-2
+      - openssl
+    override-prime: |
+      craftctl default
+      # Extract PSMDB license
+      LICENSE_LOC=usr/share/doc/percona-server-mongodb
+      zcat $CRAFT_PRIME/$LICENSE_LOC/LICENSE-Community.txt.gz \
+        > $CRAFT_PRIME/licenses/LICENSE-percona-server-mongodb
+    organize:
+      usr/share/doc/percona-server-mongodb/copyright: licenses/COPYRIGHT-percona-server-mongodb
+      usr/share/doc/percona-server-mongodb-server/copyright: licenses/COPYRIGHT-percona-server-mongodb-server
+      usr/share/doc/percona-server-mongodb-tools/copyright: licenses/COPYRIGHT-percona-server-mongodb-tools
+      usr/share/doc/percona-server-mongodb-mongos/copyright: licenses/COPYRIGHT-percona-server-mongodb-mongos
+      usr/share/doc/percona-mongodb-mongosh/copyright: licenses/COPYRIGHT-percona-mongodb-mongosh
+      usr/share/doc/percona-backup-mongodb/copyright: licenses/COPYRIGHT-percona-backup-mongodb
+      usr/share/doc/util-linux/copyright: licenses/COPYRIGHT-util-linux
+      # libsasl2-modules, libgssapi-krb5-2, openssl may not ship copyright files in all versions
+    prime:
+      # Percona telemetry agent (pulled in as hard dependency; not shipped)
+      - -usr/bin/percona-telemetry-agent
+      - -etc/default/percona-telemetry-agent
+      - -etc/logrotate.d
+      - -usr/sbin/logrotate
+      - -lib/systemd
+      - -usr/lib/systemd
+      # Host-only integration files
+      - -etc/init.d
+      - -etc/apparmor.d
+  snap-scripts:
+    plugin: dump
+    source: snap/local
+    source-type: local
+    override-prime: |
+      craftctl default
+      sed -i 's/_NAME_/$SNAPCRAFT_PROJECT_NAME/g' bin/*.sh
+      sed -i 's/_NAME_/$SNAPCRAFT_PROJECT_NAME/g' etc/*.conf
+  snap-license:
+    plugin: dump
+    source: .
+    source-type: local
+    stage:
+      - licenses/LICENSE
+    organize:
+      LICENSE: licenses/LICENSE-percona-server-mongodb-snap
