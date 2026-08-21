@@ -21,6 +21,7 @@ execute: |
 
   DUMP_DIR="/var/snap/percona-server-mongodb/common/cli-dump"
   mkdir -p "$DUMP_DIR"
+  chown snap_daemon:snap_daemon "$DUMP_DIR"
 
   echo "Test mongodump"
   percona-server-mongodb.mongodump --out "$DUMP_DIR" --db clitest

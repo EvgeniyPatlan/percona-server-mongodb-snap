@@ -11,7 +11,6 @@ prepare: |
 
 execute: |
   echo "Setting up replica set for PBM"
-  percona-server-mongodb.set-keyfile
 
   MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
   sed -i \
@@ -35,6 +34,17 @@ execute: |
 
   percona-server-mongodb.mongosh --quiet --eval 'rs.initiate()'
 
+  echo "Waiting for PRIMARY"
+  ok=0
+  for _ in $(seq 30); do
+    if percona-server-mongodb.mongosh --port 27017 --quiet --eval 'rs.status().myState' 2>/dev/null | grep -qx 1; then
+      ok=1
+      break
+    fi
+    sleep 2
+  done
+  [ "$ok" = 1 ]
+
   percona-server-mongodb.mongosh --quiet --eval '
     db.getSiblingDB("admin").createUser({
       user: "admin",
@@ -55,6 +65,7 @@ execute: |
   echo "Setting up PBM"
   PBM_STORE="/var/snap/percona-server-mongodb/common/pbm-store"
   mkdir -p "$PBM_STORE"
+  chown snap_daemon:snap_daemon "$PBM_STORE"
 
   PBM_CONFIG_FILE="/var/snap/percona-server-mongodb/common/pbm-config.yaml"
   echo "storage:" > "$PBM_CONFIG_FILE"
@@ -83,7 +94,7 @@ execute: |
   echo "Taking backup (--ns-scoped to smoketest database)"
   percona-server-mongodb.pbm backup --ns "smoketest.*" --wait
 
-  backup_name=$(percona-server-mongodb.pbm list | grep 'Snapshot' | head -1 | awk '{print $3}')
+  backup_name=$(percona-server-mongodb.pbm list | awk '/^[[:space:]]*[0-9]{4}-/{print $1; exit}')
   if [ -z "$backup_name" ]; then
     echo "Could not determine backup name"
     exit 1
@@ -104,7 +115,7 @@ execute: |
   '
 
   echo "Restoring from backup (--ns-scoped)"
-  percona-server-mongodb.pbm restore "$backup_name" --ns "smoketest.*" --wait
+  percona-server-mongodb.pbm restore "$backup_name" --ns "smoketest.*" --wait -y
 
   echo "Verifying restore"
   percona-server-mongodb.mongosh --quiet --eval '

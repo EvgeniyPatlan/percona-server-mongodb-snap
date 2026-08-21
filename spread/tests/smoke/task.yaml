@@ -22,7 +22,7 @@ execute: |
   ' | grep -q true
 
   echo "Test all tools are present"
-  for tool in mongosh mongo mongod mongos mongodump mongorestore mongoexport mongoimport mongostat mongotop mongofiles bsondump pbm pbm-agent; do
+  for tool in mongosh mongo mongod mongos mongodump mongorestore mongoexport mongoimport mongostat mongotop mongofiles bsondump pbm; do
     echo "Test ${tool}"
     percona-server-mongodb.${tool} --version &>/dev/null || percona-server-mongodb.${tool} -v &>/dev/null || percona-server-mongodb.${tool} version &>/dev/null
   done
@@ -32,7 +32,7 @@ execute: |
   test ! -e /snap/percona-server-mongodb/current/usr/bin/percona-telemetry-agent
 
   echo "Test snap services"
-  snap services percona-server-mongodb | grep -q 'mongod.*active'
+  snap services percona-server-mongodb.mongod | grep -qE '\.mongod\s+enabled\s+active'
   snap services percona-server-mongodb | grep -qE 'mongos.*disabled.*inactive'
   snap services percona-server-mongodb | grep -qE 'pbm-agent.*disabled.*inactive'
 

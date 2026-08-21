@@ -10,9 +10,6 @@ prepare: |
   [ "$ok" = 1 ]
 
 execute: |
-  echo "Setting up keyfile for CSRS"
-  percona-server-mongodb.set-keyfile
-
   echo "Configuring mongod as CSRS"
   MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
   sed -i \
@@ -62,6 +59,10 @@ execute: |
   sed -i 's/^#  configDB:.*/  configDB: rs0\/127.0.0.1:27017/g' "$MONGOS_CONF"
   echo "security:" >> "$MONGOS_CONF"
   echo "  keyFile: /var/snap/percona-server-mongodb/current/etc/mongodb-keyfile" >> "$MONGOS_CONF"
+  grep -q '^sharding:' "$MONGOS_CONF"
+  grep -q '^  configDB: rs0/127.0.0.1:27017' "$MONGOS_CONF"
+  grep -q '^security:' "$MONGOS_CONF"
+  grep -q '^  keyFile: /var/snap/percona-server-mongodb/current/etc/mongodb-keyfile' "$MONGOS_CONF"
 
   echo "Starting mongos"
   snap start percona-server-mongodb.mongos
@@ -75,7 +76,10 @@ execute: |
   [ "$ok" = 1 ]
 
   echo "Verifying sharding status"
-  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); sh.status()' | grep -q "rs0"
+  CONFIG_MAP=$(percona-server-mongodb.mongosh --quiet --port 27018 --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); db.adminCommand({getShardMap:1}).map.config')
+  [ "$CONFIG_MAP" != "" ]
+  echo "$CONFIG_MAP" | grep -q "rs0/"
+  percona-server-mongodb.mongosh --quiet --port 27018 --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); db.hello().msg' | grep -q isdbgrid
 
   echo "Mongos router test completed successfully"
 
