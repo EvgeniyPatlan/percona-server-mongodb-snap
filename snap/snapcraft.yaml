@@ -1,7 +1,7 @@
 name: percona-server-mongodb
 title: Percona Server for MongoDB
 base: core24
-version: '8.0.29-13'
+version: '8.3.7-1'
 summary: Percona Server for MongoDB server and tools in a snap.
 description: |
   Percona Server for MongoDB is a source-available, enhanced drop-in
@@ -57,8 +57,11 @@ hooks:
   configure: {}
 
 package-repositories:
+  # 8.3 is a MongoDB rapid release: when Percona ships the next rapid
+  # (psmdb-84, ...), this branch's repo url, version, and pins move
+  # together (psmdb-82 has already been retired upstream).
   - type: apt
-    url: https://repo.percona.com/psmdb-80/apt
+    url: https://repo.percona.com/psmdb-83/apt
     suites: [noble]
     components: [main]
     key-id: 4D1BB29D63D98E422B2113B19334A25F8507EFA5
@@ -159,12 +162,12 @@ parts:
   packages-deb:
     plugin: nil
     stage-packages:
-      - percona-server-mongodb=8.0.29-13.noble  # doc-only meta: the sole shipper of LICENSE-Community.txt.gz (SSPL disclosure)
-      - percona-server-mongodb-server=8.0.29-13.noble
-      - percona-server-mongodb-tools=8.0.29-13.noble
-      - percona-server-mongodb-mongos=8.0.29-13.noble
-      - percona-server-mongodb-shell=8.0.29-13.noble
-      - percona-mongodb-mongosh=2.10.0.noble
+      - percona-server-mongodb=8.3.7-1.noble  # doc-only meta: the sole shipper of LICENSE-Community.txt.gz (SSPL disclosure)
+      - percona-server-mongodb-server=8.3.7-1.noble
+      - percona-server-mongodb-tools=8.3.7-1.noble
+      - percona-server-mongodb-mongos=8.3.7-1.noble
+      - percona-server-mongodb-shell=8.3.7-1.noble
+      - percona-mongodb-mongosh=2.9.2.noble
       - percona-backup-mongodb=2.15.0-1.noble
       - util-linux
       - libsasl2-modules

@@ -27,7 +27,7 @@ jobs:
     name: Promote snaps
     uses: canonical/data-platform-workflows/.github/workflows/_promote_snaps.yaml@v50
     with:
-      track: '8.0'
+      track: '8.3'
       from-risk: ${{ inputs.from-risk }}
       to-risk: ${{ inputs.to-risk }}
       path-to-snap-directory: snap

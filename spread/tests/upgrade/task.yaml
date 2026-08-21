@@ -1,10 +1,10 @@
 summary: Percona Server for MongoDB upgrade test
 
-# TODO(release): remove `manual` once percona-server-mongodb is published to 8.0/edge
+# TODO(release): remove `manual` once percona-server-mongodb is published to 8.3/edge
 manual: true
 
 prepare: |
-  snap install percona-server-mongodb --channel 8.0/edge
+  snap install percona-server-mongodb --channel 8.3/edge
   ok=0
   for _ in $(seq 60); do
     percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
