@@ -1,0 +1,64 @@
+summary: Percona Server for MongoDB upgrade test
+
+# TODO(release): remove `manual` once percona-server-mongodb is published to 8.0/edge
+manual: true
+
+prepare: |
+  snap install percona-server-mongodb --channel 8.0/edge || echo "Channel not available yet, will use local artifact"
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' 2>/dev/null && break
+    sleep 2
+  done
+
+execute: |
+  echo "Creating test data before upgrade..."
+
+  CMD="percona-server-mongodb.mongosh --quiet"
+
+  ${CMD} --eval "
+    db.getSiblingDB('upgrade_test').data.insertMany([
+      {_id: 1, name: 'doc1', timestamp: new Date()},
+      {_id: 2, name: 'doc2', timestamp: new Date()},
+      {_id: 3, name: 'doc3', timestamp: new Date()}
+    ])
+  "
+
+  # Verify data was written
+  doc_count=$(${CMD} --eval "
+    db.getSiblingDB('upgrade_test').data.countDocuments({})
+  ")
+
+  if [ "$doc_count" != "3" ]; then
+    echo "Failed to create test data before upgrade"
+    exit 1
+  fi
+
+  echo "Upgrading to local snap..."
+  snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+  echo "Checking test data after upgrade..."
+
+  # Verify original data still exists
+  doc_count=$(${CMD} --eval "
+    db.getSiblingDB('upgrade_test').data.countDocuments({})
+  ")
+
+  if [ "$doc_count" != "3" ]; then
+    echo "Expected 3 documents after upgrade, got $doc_count"
+    exit 1
+  fi
+
+  # Verify we can read specific documents
+  ${CMD} --eval "
+    db.getSiblingDB('upgrade_test').data.find({})
+  " | grep -q "doc1"
+
+  echo "Upgrade test passed - data persisted correctly"
+
+restore: |
+  snap remove percona-server-mongodb --purge --terminate

@@ -1,0 +1,57 @@
+summary: Replica set setup and basic operations
+
+prepare: |
+  snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+execute: |
+  echo "Setting up keyfile"
+  percona-server-mongodb.set-keyfile
+
+  echo "Enabling security and replication in config"
+  MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
+  sed -i 's/^#\s*security:/security:/g' "$MONGOD_CONF"
+  sed -i 's/^#\s*replication:/replication:/g' "$MONGOD_CONF"
+
+  echo "Restarting mongod with security enabled"
+  snap restart percona-server-mongodb.mongod
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+  echo "Initiating replica set (localhost exception allows first user ops)"
+  percona-server-mongodb.mongosh --quiet --eval '
+    rs.initiate()
+  '
+
+  echo "Creating admin user via localhost exception"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").createUser({
+      user: "admin",
+      pwd: "adminpassword",
+      roles: [{role: "root", db: "admin"}]
+    })
+  '
+
+  echo "Testing majority-concern write"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").auth("admin", "adminpassword")
+    db.getSiblingDB("rstest").data.insertOne({_id: 1, value: "test"}, {writeConcern: {w: "majority"}})
+  '
+
+  echo "Verifying replica set status"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").auth("admin", "adminpassword")
+    status = rs.status()
+    primary_member = status.members.find(m => m.stateStr == "PRIMARY")
+    if (!primary_member) throw new Error("No PRIMARY found")
+  '
+
+  echo "Replica set initialized successfully"
+
+restore: |
+  snap remove percona-server-mongodb --purge --terminate || true

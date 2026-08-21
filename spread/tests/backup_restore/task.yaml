@@ -1,0 +1,122 @@
+summary: Percona Backup for MongoDB integration test
+
+prepare: |
+  snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+execute: |
+  echo "Setting up replica set for PBM"
+  percona-server-mongodb.set-keyfile
+
+  MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
+  sed -i 's/^#\s*security:/security:/g' "$MONGOD_CONF"
+  sed -i 's/^#\s*replication:/replication:/g' "$MONGOD_CONF"
+
+  snap restart percona-server-mongodb.mongod
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+  percona-server-mongodb.mongosh --quiet --eval 'rs.initiate()'
+
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").createUser({
+      user: "admin",
+      pwd: "adminpassword",
+      roles: [{role: "root", db: "admin"}]
+    })
+  '
+
+  echo "Creating test data before backup"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").auth("admin", "adminpassword")
+    db.getSiblingDB("smoketest").data.insertMany([
+      {_id: 1, name: "doc1", value: "original"},
+      {_id: 2, name: "doc2", value: "data"}
+    ])
+  '
+
+  echo "Setting up PBM"
+  PBM_STORE="/var/snap/percona-server-mongodb/common/pbm-store"
+  mkdir -p "$PBM_STORE"
+
+  PBM_CONFIG_FILE="/tmp/pbm-config.yaml"
+  echo "storage:" > "$PBM_CONFIG_FILE"
+  echo "  type: filesystem" >> "$PBM_CONFIG_FILE"
+  echo "  filesystem:" >> "$PBM_CONFIG_FILE"
+  echo "    path: /var/snap/percona-server-mongodb/common/pbm-store" >> "$PBM_CONFIG_FILE"
+
+  percona-server-mongodb.pbm config --file "$PBM_CONFIG_FILE"
+
+  echo "Configuring PBM URI and starting pbm-agent"
+  PBM_URI="mongodb://admin:adminpassword@127.0.0.1:27017/?replicaSet=rs0&authSource=admin"
+  snap set percona-server-mongodb pbm-uri="$PBM_URI"
+  snap start percona-server-mongodb.pbm-agent
+
+  # Wait for pbm-agent to be ready
+  for _ in $(seq 30); do
+    if percona-server-mongodb.pbm status 2>/dev/null | grep -q OK; then
+      break
+    fi
+    sleep 2
+  done
+
+  echo "Taking backup (--ns-scoped to smoketest database)"
+  percona-server-mongodb.pbm backup --ns "smoketest.*" --wait
+
+  backup_name=$(percona-server-mongodb.pbm list | grep 'Snapshot' | head -1 | awk '{print $3}')
+  if [ -z "$backup_name" ]; then
+    echo "Could not determine backup name"
+    exit 1
+  fi
+
+  echo "Backup name: $backup_name"
+
+  echo "Inserting marker document"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").auth("admin", "adminpassword")
+    db.getSiblingDB("smoketest").marker.insertOne({_id: "restore-marker", timestamp: new Date()})
+  '
+
+  echo "Dropping smoketest database"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").auth("admin", "adminpassword")
+    db.getSiblingDB("smoketest").dropDatabase()
+  '
+
+  echo "Restoring from backup (--ns-scoped)"
+  percona-server-mongodb.pbm restore "$backup_name" --ns "smoketest.*" --wait
+
+  echo "Verifying restore"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("admin").auth("admin", "adminpassword")
+
+    // Check that marker does not exist (it was not in the backup)
+    marker_count = db.getSiblingDB("smoketest").marker.countDocuments({})
+    if (marker_count != 0) {
+      throw new Error("Marker document should not exist after restore")
+    }
+
+    // Check that original data was restored
+    data_count = db.getSiblingDB("smoketest").data.countDocuments({})
+    if (data_count != 2) {
+      throw new Error("Expected 2 documents in restored data, got " + data_count)
+    }
+
+    // Verify specific document
+    doc = db.getSiblingDB("smoketest").data.findOne({_id: 1})
+    if (doc.value != "original") {
+      throw new Error("Document value mismatch after restore")
+    }
+  '
+
+  echo "Backup and restore completed successfully"
+
+restore: |
+  snap remove percona-server-mongodb --purge --terminate || true
+  rm -rf /var/snap/percona-server-mongodb/common/pbm-store || true
+  rm -f /tmp/pbm-config.yaml || true

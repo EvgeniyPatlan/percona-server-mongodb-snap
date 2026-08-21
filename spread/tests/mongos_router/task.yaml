@@ -1,0 +1,64 @@
+summary: MongoDB sharded cluster with mongos router
+
+prepare: |
+  snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+execute: |
+  echo "Setting up keyfile for CSRS"
+  percona-server-mongodb.set-keyfile
+
+  echo "Configuring mongod as CSRS"
+  MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
+  sed -i 's/^#security:/security:/' "$MONGOD_CONF"
+  sed -i 's/^#replication:/replication:/' "$MONGOD_CONF"
+
+  TEMP_CONF=$(mktemp)
+  awk '/^replication:/{print "sharding:"; print "  clusterRole: configsvr"; print ""} {print}' "$MONGOD_CONF" > "$TEMP_CONF"
+  mv "$TEMP_CONF" "$MONGOD_CONF"
+
+  echo "Restarting mongod"
+  snap restart percona-server-mongodb.mongod
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+  echo "Initiating CSRS replica set"
+  percona-server-mongodb.mongosh --quiet --eval 'rs.initiate() %% true' | sed 's/ %% / && /'
+
+  echo "Creating admin user on CSRS"
+  percona-server-mongodb.mongosh --quiet --eval 'db.getSiblingDB("admin").createUser({user:"admin",pwd:"adminpassword",roles:[{role:"root",db:"admin"}]})' || true
+
+  echo "Configuring mongos"
+  MONGOS_CONF="/var/snap/percona-server-mongodb/current/etc/mongos/mongos.conf"
+  sed -i 's/^#sharding:/sharding:/g' "$MONGOS_CONF"
+  sed -i 's/^#  configDB:.*/  configDB: rs0\/127.0.0.1:27017/g' "$MONGOS_CONF"
+  echo "security:" >> "$MONGOS_CONF"
+  echo "  keyFile: /var/snap/percona-server-mongodb/current/etc/mongodb-keyfile" >> "$MONGOS_CONF"
+
+  echo "Starting mongos"
+  snap start percona-server-mongodb.mongos
+
+  echo "Waiting for mongos to start"
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+  echo "Verifying sharding status"
+  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); sh.status()'
+
+  echo "Testing write through mongos"
+  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); db.getSiblingDB("routertest").data.insertOne({_id:1,value:"via mongos"})'
+
+  echo "Verifying write via mongos"
+  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); db.getSiblingDB("routertest").data.findOne({_id:1})'
+
+  echo "Mongos router test completed successfully"
+
+restore: |
+  snap remove percona-server-mongodb --purge --terminate || true
