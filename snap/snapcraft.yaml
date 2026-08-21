@@ -163,7 +163,7 @@ parts:
       - percona-server-mongodb-server=8.0.29-13.noble
       - percona-server-mongodb-tools=8.0.29-13.noble
       - percona-server-mongodb-mongos=8.0.29-13.noble
-      - percona-mongodb-mongosh=8.0.29.noble
+      - percona-mongodb-mongosh=2.10.0.noble
       - percona-backup-mongodb=2.15.0-1.noble
       - util-linux
       - libsasl2-modules
