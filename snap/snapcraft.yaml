@@ -14,11 +14,19 @@ description: |
   127.0.0.1:27017; connect immediately with:
     percona-server-mongodb.mongosh
 
+  The standalone server starts with authorization DISABLED — any local
+  process can read and write via 127.0.0.1:27017. Enable the security
+  section in mongod.conf (see below) before putting data you care about
+  on it.
+
   Config lives at /var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf
   (extra flags: `sudo snap set percona-server-mongodb mongod-args="..."`).
-  To form a replica set: run `sudo percona-server-mongodb.set-keyfile`,
-  uncomment the security/replication sections in mongod.conf, then
-  `sudo snap restart percona-server-mongodb.mongod` and initiate with
+  A replica-set keyfile is generated automatically at install time;
+  `sudo percona-server-mongodb.get-keyfile` prints it so you can copy it
+  to other members, and `sudo percona-server-mongodb.set-keyfile` installs
+  a provided key. To form a replica set: uncomment the security/replication
+  sections in mongod.conf, then `sudo snap restart
+  percona-server-mongodb.mongod` and initiate with
   `percona-server-mongodb.mongosh --eval 'rs.initiate()'`.
 
   Optional services (disabled by default, start with `snap start`):
