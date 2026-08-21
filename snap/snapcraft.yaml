@@ -171,6 +171,7 @@ parts:
       - libsasl2-modules-gssapi-mit
       - libgssapi-krb5-2
       - openssl
+      - libstdc++6  # mongosh (percona-mongodb-mongosh) dynamically links libstdc++.so.6; not provided by core24
     override-prime: |
       craftctl default
       # Extract PSMDB license
@@ -196,6 +197,31 @@ parts:
       # Host-only integration files
       - -etc/init.d
       - -etc/apparmor.d
+      # Mute lint by removing unnecessary libs flagged as unused by the
+      # snapcraft library linter (glibc compat stubs, NSS modules, and
+      # util-linux/libcap2 transitive deps not dlopen'd or linked at runtime)
+      - -usr/lib/*/libBrokenLocale.so*
+      - -usr/lib/*/libanl.so*
+      - -usr/lib/*/libbrotlienc.so*
+      - -usr/lib/*/libc_malloc_debug.so*
+      - -usr/lib/*/libdl.so*
+      - -usr/lib/*/libdrop_ambient.so*
+      - -usr/lib/*/libmemusage.so*
+      - -usr/lib/*/libmvec.so*
+      - -usr/lib/*/libnsl.so*
+      - -usr/lib/*/libnss_compat.so*
+      - -usr/lib/*/libnss_dns.so*
+      - -usr/lib/*/libnss_files.so*
+      - -usr/lib/*/libnss_hesiod.so*
+      - -usr/lib/*/libpamc.so*
+      - -usr/lib/*/libpcprofile.so*
+      - -usr/lib/*/libpopt.so*
+      - -usr/lib/*/libpsx.so*
+      - -usr/lib/*/libpthread.so*
+      - -usr/lib/*/librt.so*
+      - -usr/lib/*/libthread_db.so*
+      - -usr/lib/*/libtic.so*
+      - -usr/lib/*/libutil.so*
   snap-scripts:
     plugin: dump
     source: snap/local
@@ -209,6 +235,6 @@ parts:
     source: .
     source-type: local
     stage:
-      - licenses/LICENSE
+      - licenses/LICENSE-percona-server-mongodb-snap
     organize:
       LICENSE: licenses/LICENSE-percona-server-mongodb-snap
