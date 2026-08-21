@@ -4,11 +4,13 @@ summary: Percona Server for MongoDB upgrade test
 manual: true
 
 prepare: |
-  snap install percona-server-mongodb --channel 8.0/edge || echo "Channel not available yet, will use local artifact"
+  snap install percona-server-mongodb --channel 8.0/edge
+  ok=0
   for _ in $(seq 60); do
-    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' 2>/dev/null && break
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
     sleep 2
   done
+  [ "$ok" = 1 ]
 
 execute: |
   echo "Creating test data before upgrade..."
@@ -36,10 +38,12 @@ execute: |
   echo "Upgrading to local snap..."
   snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
 
+  ok=0
   for _ in $(seq 60); do
-    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
     sleep 2
   done
+  [ "$ok" = 1 ]
 
   echo "Checking test data after upgrade..."
 
@@ -61,4 +65,4 @@ execute: |
   echo "Upgrade test passed - data persisted correctly"
 
 restore: |
-  snap remove percona-server-mongodb --purge --terminate
+  snap remove percona-server-mongodb --purge --terminate || true

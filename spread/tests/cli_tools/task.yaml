@@ -2,10 +2,12 @@ summary: CLI tools integration test
 
 prepare: |
   snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+  ok=0
   for _ in $(seq 60); do
-    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
     sleep 2
   done
+  [ "$ok" = 1 ]
 
 execute: |
   echo "Seeding test data"

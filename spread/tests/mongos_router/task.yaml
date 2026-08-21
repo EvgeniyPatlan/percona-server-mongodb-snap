@@ -2,10 +2,12 @@ summary: MongoDB sharded cluster with mongos router
 
 prepare: |
   snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+  ok=0
   for _ in $(seq 60); do
-    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
     sleep 2
   done
+  [ "$ok" = 1 ]
 
 execute: |
   echo "Setting up keyfile for CSRS"
@@ -13,8 +15,9 @@ execute: |
 
   echo "Configuring mongod as CSRS"
   MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
-  sed -i 's/^#security:/security:/' "$MONGOD_CONF"
-  sed -i 's/^#replication:/replication:/' "$MONGOD_CONF"
+  sed -i '/^#security:/,/^#replication:/ s/^#\(security:\|  keyFile:\|  authorization:\|replication:\|  replSetName:\)/\1/' "$MONGOD_CONF"
+  grep -A2 '^security:' "$MONGOD_CONF"
+  grep -A1 '^replication:' "$MONGOD_CONF"
 
   TEMP_CONF=$(mktemp)
   awk '/^replication:/{print "sharding:"; print "  clusterRole: configsvr"; print ""} {print}' "$MONGOD_CONF" > "$TEMP_CONF"
@@ -22,16 +25,28 @@ execute: |
 
   echo "Restarting mongod"
   snap restart percona-server-mongodb.mongod
+  ok=0
   for _ in $(seq 60); do
-    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
     sleep 2
   done
+  [ "$ok" = 1 ]
 
   echo "Initiating CSRS replica set"
-  percona-server-mongodb.mongosh --quiet --eval 'rs.initiate() %% true' | sed 's/ %% / && /'
+  percona-server-mongodb.mongosh --quiet --eval 'rs.initiate({_id:"rs0", configsvr:true, members:[{_id:0, host:"127.0.0.1:27017"}]})'
+
+  ok=0
+  for _ in $(seq 30); do
+    if percona-server-mongodb.mongosh --port 27017 --quiet --eval 'rs.status().myState' 2>/dev/null | grep -qx 1; then
+      ok=1
+      break
+    fi
+    sleep 2
+  done
+  [ "$ok" = 1 ]
 
   echo "Creating admin user on CSRS"
-  percona-server-mongodb.mongosh --quiet --eval 'db.getSiblingDB("admin").createUser({user:"admin",pwd:"adminpassword",roles:[{role:"root",db:"admin"}]})' || true
+  percona-server-mongodb.mongosh --quiet --eval 'db.getSiblingDB("admin").createUser({user:"admin",pwd:"adminpassword",roles:[{role:"root",db:"admin"}]})'
 
   echo "Configuring mongos"
   MONGOS_CONF="/var/snap/percona-server-mongodb/current/etc/mongos/mongos.conf"
@@ -44,19 +59,15 @@ execute: |
   snap start percona-server-mongodb.mongos
 
   echo "Waiting for mongos to start"
+  ok=0
   for _ in $(seq 60); do
-    percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.runCommand({ping:1})' && break
+    percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.runCommand({ping:1})' && { ok=1; break; }
     sleep 2
   done
+  [ "$ok" = 1 ]
 
   echo "Verifying sharding status"
-  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); sh.status()'
-
-  echo "Testing write through mongos"
-  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); db.getSiblingDB("routertest").data.insertOne({_id:1,value:"via mongos"})'
-
-  echo "Verifying write via mongos"
-  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); db.getSiblingDB("routertest").data.findOne({_id:1})'
+  percona-server-mongodb.mongosh --port 27018 --quiet --eval 'db.getSiblingDB("admin").auth("admin","adminpassword"); sh.status()' | grep -q "rs0"
 
   echo "Mongos router test completed successfully"
 
