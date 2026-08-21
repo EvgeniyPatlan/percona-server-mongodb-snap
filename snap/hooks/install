@@ -22,3 +22,10 @@ chown -R snap_daemon:root "${SNAP_COMMON}/var" "${RUN}" "${HOME_DIR}" \
       "${SNAP_DATA}/etc"
 chmod 750 "${DATA}"
 chmod -R 770 "${LOGS_D}" "${LOGS_S}" "${RUN}"
+
+# Mint the replica-set keyfile once; operators copy it to other members
+# with get-keyfile / set-keyfile.
+if [ ! -s "${SNAP_DATA}/etc/mongodb-keyfile" ]; then
+    "${SNAP}/usr/bin/setpriv" --clear-groups --reuid snap_daemon --regid snap_daemon -- \
+        bash -euo pipefail -c ". '${SNAP}/bin/keyfile-common.sh'; generate_keyfile"
+fi
