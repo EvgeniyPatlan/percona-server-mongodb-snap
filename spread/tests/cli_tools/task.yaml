@@ -1,0 +1,73 @@
+summary: CLI tools integration test
+
+prepare: |
+  snap install "${SPREAD_PATH}/$(basename "${CRAFT_ARTIFACT}")" --dangerous --jailmode
+  for _ in $(seq 60); do
+    percona-server-mongodb.mongosh --quiet --eval 'db.runCommand({ping:1})' && break
+    sleep 2
+  done
+
+execute: |
+  echo "Seeding test data"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("clitest").data.insertMany([
+      {_id: 1, name: "Alice", value: 100},
+      {_id: 2, name: "Bob", value: 200},
+      {_id: 3, name: "Charlie", value: 300}
+    ])
+  '
+
+  DUMP_DIR="/var/snap/percona-server-mongodb/common/cli-dump"
+  mkdir -p "$DUMP_DIR"
+
+  echo "Test mongodump"
+  percona-server-mongodb.mongodump --out "$DUMP_DIR" --db clitest
+
+  echo "Test bsondump"
+  bson_file="$DUMP_DIR/clitest/data.bson"
+  if [ ! -f "$bson_file" ]; then
+    # Try alternate location
+    bson_file=$(find "$DUMP_DIR" -name "*.bson" | head -1)
+  fi
+  percona-server-mongodb.bsondump "$bson_file" | grep -q 'Alice'
+
+  echo "Drop collection and restore"
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("clitest").data.drop()
+  '
+
+  echo "Test mongorestore"
+  percona-server-mongodb.mongorestore --db clitest "$DUMP_DIR/clitest/"
+
+  echo "Verify restored data"
+  count=$(percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("clitest").data.countDocuments({})
+  ')
+  if [ "$count" != "3" ]; then
+    echo "Expected 3 documents, got $count"
+    exit 1
+  fi
+
+  echo "Test mongoexport/mongoimport JSON round-trip"
+  export_file="$DUMP_DIR/export.json"
+  percona-server-mongodb.mongoexport --db clitest --collection data --out "$export_file"
+
+  percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("clitest").data_imported.drop()
+  ' || true
+
+  percona-server-mongodb.mongoimport --db clitest --collection data_imported "$export_file"
+
+  imported_count=$(percona-server-mongodb.mongosh --quiet --eval '
+    db.getSiblingDB("clitest").data_imported.countDocuments({})
+  ')
+  if [ "$imported_count" != "3" ]; then
+    echo "Expected 3 imported documents, got $imported_count"
+    exit 1
+  fi
+
+  echo "All CLI tools tests passed"
+
+restore: |
+  rm -rf /var/snap/percona-server-mongodb/common/cli-dump || true
+  snap remove percona-server-mongodb --purge --terminate || true

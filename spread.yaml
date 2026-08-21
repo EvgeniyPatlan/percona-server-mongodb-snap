@@ -1,0 +1,23 @@
+project: percona-server-mongodb-snap
+
+path: /home/ubuntu/percona-server-mongodb-snap
+
+environment:
+  CRAFT_ARTIFACT: $(HOST:printenv CRAFT_ARTIFACT)
+
+backends:
+  lxd:
+    type: lxd
+    systems:
+      - ubuntu-24.04
+
+suites:
+  spread/tests/:
+    summary: General integration tests
+    prepare: |
+      apt remove --purge --yes mongodb* percona* || true
+
+exclude:
+  - .git
+
+kill-timeout: 1h
