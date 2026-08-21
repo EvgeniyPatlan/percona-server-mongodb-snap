@@ -19,6 +19,6 @@ if [ ! -f "${SNAP_DATA}/etc/mongos/mongos.conf" ]; then
 fi
 
 chown -R snap_daemon:root "${SNAP_COMMON}/var" "${RUN}" "${HOME_DIR}" \
-      "${SNAP_DATA}/etc/mongod" "${SNAP_DATA}/etc/mongos"
+      "${SNAP_DATA}/etc"
 chmod 750 "${DATA}"
 chmod -R 770 "${LOGS_D}" "${LOGS_S}" "${RUN}"
