@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -eux
+
+DATA="${SNAP_COMMON}/var/lib/mongodb"
+LOGS_D="${SNAP_COMMON}/var/log/mongodb"
+LOGS_S="${SNAP_COMMON}/var/log/mongos"
+RUN="${SNAP_COMMON}/run"
+HOME_DIR="${SNAP_DATA}/home"
+
+mkdir -p "${DATA}" "${LOGS_D}" "${LOGS_S}" "${RUN}" \
+         "${SNAP_DATA}/etc/mongod" "${SNAP_DATA}/etc/mongos" \
+         "${HOME_DIR}/.cache" "${HOME_DIR}/.config" "${HOME_DIR}/.mongodb/mongosh"
+
+if [ ! -f "${SNAP_DATA}/etc/mongod/mongod.conf" ]; then
+    cp "${SNAP}/etc/mongod.conf" "${SNAP_DATA}/etc/mongod/mongod.conf"
+fi
+if [ ! -f "${SNAP_DATA}/etc/mongos/mongos.conf" ]; then
+    cp "${SNAP}/etc/mongos.conf" "${SNAP_DATA}/etc/mongos/mongos.conf"
+fi
+
+chown -R snap_daemon:root "${SNAP_COMMON}/var" "${RUN}" "${HOME_DIR}" \
+      "${SNAP_DATA}/etc/mongod" "${SNAP_DATA}/etc/mongos"
+chmod 750 "${DATA}"
+chmod -R 770 "${LOGS_D}" "${LOGS_S}" "${RUN}"

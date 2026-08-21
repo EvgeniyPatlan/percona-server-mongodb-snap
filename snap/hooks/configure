@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+# No-op configure hook: exists only to allow `snap set` to accept custom configuration.
