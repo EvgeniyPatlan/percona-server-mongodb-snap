@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wrapper script for charmed mongodb applications to be run with restricted privileges
 
-export PBM_MONGODB_URI="$(snapctl get pbm-uri)"
+export PBM_MONGODB_URI="$(snapctl get pbm-uri 2>/dev/null || true)"
 
 pushd "${SNAP}" > /dev/null
 
