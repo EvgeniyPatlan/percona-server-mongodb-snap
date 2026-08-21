@@ -15,13 +15,21 @@ execute: |
 
   echo "Configuring mongod as CSRS"
   MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
-  sed -i '/^#security:/,/^#replication:/ s/^#\(security:\|  keyFile:\|  authorization:\|replication:\|  replSetName:\)/\1/' "$MONGOD_CONF"
-  grep -A2 '^security:' "$MONGOD_CONF"
-  grep -A1 '^replication:' "$MONGOD_CONF"
+  sed -i \
+    -e 's|^#security:|security:|' \
+    -e 's|^#  keyFile:|  keyFile:|' \
+    -e 's|^#  authorization:|  authorization:|' \
+    -e 's|^#replication:|replication:|' \
+    -e 's|^#  replSetName:|  replSetName:|' \
+    "$MONGOD_CONF"
+  grep -q '^  replSetName: rs0' "$MONGOD_CONF"
+  grep -q '^  authorization: enabled' "$MONGOD_CONF"
+  grep -q '^  keyFile: ' "$MONGOD_CONF"
 
   TEMP_CONF=$(mktemp)
   awk '/^replication:/{print "sharding:"; print "  clusterRole: configsvr"; print ""} {print}' "$MONGOD_CONF" > "$TEMP_CONF"
   mv "$TEMP_CONF" "$MONGOD_CONF"
+  grep -q '^\s*clusterRole: configsvr' "$MONGOD_CONF"
 
   echo "Restarting mongod"
   snap restart percona-server-mongodb.mongod

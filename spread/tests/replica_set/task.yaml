@@ -15,9 +15,16 @@ execute: |
 
   echo "Enabling security and replication in config"
   MONGOD_CONF="/var/snap/percona-server-mongodb/current/etc/mongod/mongod.conf"
-  sed -i '/^#security:/,/^#replication:/ s/^#\(security:\|  keyFile:\|  authorization:\|replication:\|  replSetName:\)/\1/' "$MONGOD_CONF"
-  grep -A2 '^security:' "$MONGOD_CONF"
-  grep -A1 '^replication:' "$MONGOD_CONF"
+  sed -i \
+    -e 's|^#security:|security:|' \
+    -e 's|^#  keyFile:|  keyFile:|' \
+    -e 's|^#  authorization:|  authorization:|' \
+    -e 's|^#replication:|replication:|' \
+    -e 's|^#  replSetName:|  replSetName:|' \
+    "$MONGOD_CONF"
+  grep -q '^  replSetName: rs0' "$MONGOD_CONF"
+  grep -q '^  authorization: enabled' "$MONGOD_CONF"
+  grep -q '^  keyFile: ' "$MONGOD_CONF"
 
   echo "Restarting mongod with security enabled"
   snap restart percona-server-mongodb.mongod
