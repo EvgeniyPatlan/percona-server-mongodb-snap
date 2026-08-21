@@ -67,7 +67,7 @@ package-repositories:
     suites: [noble]
     components: [main]
     key-id: 4D1BB29D63D98E422B2113B19334A25F8507EFA5
-  # Needed only because percona-server-mongodb depends on
+  # Needed only because percona-server-mongodb-server depends on
   # percona-telemetry-agent; the agent is pruned below.
   - type: apt
     url: https://repo.percona.com/telemetry/apt
@@ -159,6 +159,7 @@ parts:
   packages-deb:
     plugin: nil
     stage-packages:
+      - percona-server-mongodb=8.0.29-13.noble  # doc-only meta: the sole shipper of LICENSE-Community.txt.gz (SSPL disclosure)
       - percona-server-mongodb-server=8.0.29-13.noble
       - percona-server-mongodb-tools=8.0.29-13.noble
       - percona-server-mongodb-mongos=8.0.29-13.noble
@@ -177,14 +178,13 @@ parts:
       zcat $CRAFT_PRIME/$LICENSE_LOC/LICENSE-Community.txt.gz \
         > $CRAFT_PRIME/licenses/LICENSE-percona-server-mongodb
     organize:
-      usr/share/doc/percona-server-mongodb-server/copyright: licenses/COPYRIGHT-percona-server-mongodb-server
-      usr/share/doc/percona-server-mongodb-tools/copyright: licenses/COPYRIGHT-percona-server-mongodb-tools
-      usr/share/doc/percona-server-mongodb-mongos/copyright: licenses/COPYRIGHT-percona-server-mongodb-mongos
-      usr/share/doc/percona-server-mongodb-shell/copyright: licenses/COPYRIGHT-percona-server-mongodb-shell
+      # percona-server-mongodb component debs ship no copyright files; SSPL text staged as licenses/LICENSE-percona-server-mongodb instead.
       usr/share/doc/percona-mongodb-mongosh/copyright: licenses/COPYRIGHT-percona-mongodb-mongosh
       usr/share/doc/percona-backup-mongodb/copyright: licenses/COPYRIGHT-percona-backup-mongodb
       usr/share/doc/util-linux/copyright: licenses/COPYRIGHT-util-linux
       # libsasl2-modules, libsasl2-modules-gssapi-mit, libgssapi-krb5-2, openssl may not ship copyright files in all versions
+      # Stage collision: etc/mongod.conf relocated from -server deb
+      etc/mongod.conf: usr/share/percona-server-mongodb-server/mongod.conf.default
     prime:
       # Percona telemetry agent (pulled in as hard dependency; not shipped)
       - -usr/bin/percona-telemetry-agent

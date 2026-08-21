@@ -35,7 +35,7 @@ case "${1:-}" in
         ;;
 esac
 
-. "${SNAP}/keyfile-common.sh"
+. "${SNAP}/bin/keyfile-common.sh"
 
 if [ "$#" -gt 1 ]; then
     echo "set-keyfile: expected at most one KEY argument" >&2
@@ -49,7 +49,7 @@ if [ "$(id -u)" = "0" ]; then
         --reuid snap_daemon \
         --regid snap_daemon \
         -- \
-        "${SNAP}/set-keyfile.sh" "$@"
+        "${SNAP}/bin/set-keyfile.sh" "$@"
 fi
 
 if [ "$#" -eq 1 ]; then

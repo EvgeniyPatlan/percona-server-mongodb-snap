@@ -30,7 +30,7 @@ if [ "$#" -ne 0 ]; then
     exit 1
 fi
 
-. "${SNAP}/keyfile-common.sh"
+. "${SNAP}/bin/keyfile-common.sh"
 
 if [ ! -e "${KEYFILE}" ]; then
     echo "get-keyfile: no keyfile found at ${KEYFILE}" >&2
