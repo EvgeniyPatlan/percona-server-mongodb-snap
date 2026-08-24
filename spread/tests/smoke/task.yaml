@@ -21,23 +21,16 @@ execute: |
     db.getSiblingDB("smoketest").t1.countDocuments({}) == 2
   ' | grep -q true
 
+  # mongod/mongos are daemon apps (daemon: simple): snapd does not expose
+  # them as directly-runnable commands ("percona-server-mongodb.mongod:
+  # command not found" in CI), only as services managed via `snap
+  # services`/`snap start`/`snap restart`. Their state is already covered
+  # below: mongod's version via db.version() above and its active state
+  # via "Test snap services"; mongos's disabled/inactive state likewise.
   echo "Test all tools are present"
-  for tool in mongosh mongo mongod mongos mongodump mongorestore mongoexport mongoimport mongostat mongotop mongofiles bsondump pbm; do
+  for tool in mongosh mongo mongodump mongorestore mongoexport mongoimport mongostat mongotop mongofiles bsondump pbm; do
     echo "Test ${tool}"
-    case "${tool}" in
-      mongod|mongos)
-        # mongod/mongos are daemon-wrapped apps: their command always
-        # injects --config <path> ahead of any extra argument, so only
-        # --version is a safe probe here. "-v" is --verbose, not a
-        # version flag, and makes the binary attempt a real startup
-        # (colliding with the already-running mongod's port); bare
-        # "version" is not a valid mongod/mongos subcommand at all.
-        percona-server-mongodb.${tool} --version
-        ;;
-      *)
-        percona-server-mongodb.${tool} --version &>/dev/null || percona-server-mongodb.${tool} -v &>/dev/null || percona-server-mongodb.${tool} version &>/dev/null
-        ;;
-    esac
+    percona-server-mongodb.${tool} --version &>/dev/null || percona-server-mongodb.${tool} -v &>/dev/null || percona-server-mongodb.${tool} version &>/dev/null
   done
 
   echo "Ensure telemetry is disabled"
