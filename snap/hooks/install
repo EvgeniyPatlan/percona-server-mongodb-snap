@@ -6,25 +6,50 @@ LOGS_D="${SNAP_COMMON}/var/log/mongodb"
 LOGS_S="${SNAP_COMMON}/var/log/mongos"
 RUN="${SNAP_COMMON}/run"
 HOME_DIR="${SNAP_DATA}/home"
+ETC_D="${SNAP_DATA}/etc/mongod"
+ETC_S="${SNAP_DATA}/etc/mongos"
 
-mkdir -p "${DATA}" "${LOGS_D}" "${LOGS_S}" "${RUN}" \
-         "${SNAP_DATA}/etc/mongod" "${SNAP_DATA}/etc/mongos" \
-         "${HOME_DIR}/.cache" "${HOME_DIR}/.config" "${HOME_DIR}/.mongodb/mongosh"
+# Ownership/mode follow the proven family idiom (percona-valkey-snap's
+# install hook, CI-green under the same strict/jailmode confinement):
+# under strict confinement a path tolerates exactly ONE post-creation
+# mutating touch (chown OR chmod) -- whichever op runs second on that
+# path fails (EPERM/EACCES) regardless of order. CI evidence for this
+# hook: "chown -R ... ${SNAP_COMMON}/var ${RUN} ${HOME_DIR} ${SNAP_DATA}/etc"
+# succeeded, then the very next line, "chmod 750 .../var/lib/mongodb",
+# failed with "Operation not permitted" -- that path had already been
+# touched once by the chown -R above. The same double-touch applied to
+# LOGS_D/LOGS_S/RUN via the follow-up "chmod -R 770" line. Fix: fold each
+# directory's mode into `mkdir -m` at creation time so a single
+# `chown -R snap_daemon:root`, run immediately after populating the path,
+# is its only post-creation touch.
 
-if [ ! -f "${SNAP_DATA}/etc/mongod/mongod.conf" ]; then
-    cp "${SNAP}/etc/mongod.conf" "${SNAP_DATA}/etc/mongod/mongod.conf"
+# Data directory (mode 750, matches the original chmod 750 "${DATA}")
+mkdir -p -m 750 "${DATA}"
+chown snap_daemon:root "${DATA}"
+
+# Log directories and the run/socket directory (mode 770, matches the
+# original chmod -R 770 "${LOGS_D}" "${LOGS_S}" "${RUN}")
+mkdir -p -m 770 "${LOGS_D}" "${LOGS_S}" "${RUN}"
+chown -R snap_daemon:root "${LOGS_D}" "${LOGS_S}" "${RUN}"
+
+# Config directories: populate before the single chown
+mkdir -p "${ETC_D}" "${ETC_S}"
+if [ ! -f "${ETC_D}/mongod.conf" ]; then
+    cp "${SNAP}/etc/mongod.conf" "${ETC_D}/mongod.conf"
 fi
-if [ ! -f "${SNAP_DATA}/etc/mongos/mongos.conf" ]; then
-    cp "${SNAP}/etc/mongos.conf" "${SNAP_DATA}/etc/mongos/mongos.conf"
+if [ ! -f "${ETC_S}/mongos.conf" ]; then
+    cp "${SNAP}/etc/mongos.conf" "${ETC_S}/mongos.conf"
 fi
+chown -R snap_daemon:root "${SNAP_DATA}/etc"
 
-chown -R snap_daemon:root "${SNAP_COMMON}/var" "${RUN}" "${HOME_DIR}" \
-      "${SNAP_DATA}/etc"
-chmod 750 "${DATA}"
-chmod -R 770 "${LOGS_D}" "${LOGS_S}" "${RUN}"
+# Home directory tree used by mongosh et al.
+mkdir -p "${HOME_DIR}/.cache" "${HOME_DIR}/.config" "${HOME_DIR}/.mongodb/mongosh"
+chown -R snap_daemon:root "${HOME_DIR}"
 
 # Mint the replica-set keyfile once; operators copy it to other members
-# with get-keyfile / set-keyfile.
+# with get-keyfile / set-keyfile. This runs AS snap_daemon (setpriv) after
+# the ownership handoffs above, so it is owner-run and exempt from the
+# post-creation-touch limit -- same shape as valkey's proven analog.
 if [ ! -s "${SNAP_DATA}/etc/mongodb-keyfile" ]; then
     "${SNAP}/usr/bin/setpriv" --clear-groups --reuid snap_daemon --regid snap_daemon -- \
         bash -euo pipefail -c ". '${SNAP}/bin/keyfile-common.sh'; generate_keyfile"
