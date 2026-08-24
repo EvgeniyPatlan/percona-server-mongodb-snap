@@ -26,6 +26,13 @@ execute: |
   TEMP_CONF=$(mktemp)
   awk '/^replication:/{print "sharding:"; print "  clusterRole: configsvr"; print ""} {print}' "$MONGOD_CONF" > "$TEMP_CONF"
   mv "$TEMP_CONF" "$MONGOD_CONF"
+  # mktemp creates its file 600/root:root; mv onto MONGOD_CONF replaces
+  # the file's inode wholesale, so the install hook's snap_daemon:root
+  # ownership and readable mode are lost. Restore them -- otherwise
+  # mongod (running as snap_daemon) can no longer open its own config
+  # file after the restart below and never comes back up.
+  chown snap_daemon:root "$MONGOD_CONF"
+  chmod 644 "$MONGOD_CONF"
   grep -q '^\s*clusterRole: configsvr' "$MONGOD_CONF"
 
   echo "Restarting mongod"

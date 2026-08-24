@@ -24,7 +24,20 @@ execute: |
   echo "Test all tools are present"
   for tool in mongosh mongo mongod mongos mongodump mongorestore mongoexport mongoimport mongostat mongotop mongofiles bsondump pbm; do
     echo "Test ${tool}"
-    percona-server-mongodb.${tool} --version &>/dev/null || percona-server-mongodb.${tool} -v &>/dev/null || percona-server-mongodb.${tool} version &>/dev/null
+    case "${tool}" in
+      mongod|mongos)
+        # mongod/mongos are daemon-wrapped apps: their command always
+        # injects --config <path> ahead of any extra argument, so only
+        # --version is a safe probe here. "-v" is --verbose, not a
+        # version flag, and makes the binary attempt a real startup
+        # (colliding with the already-running mongod's port); bare
+        # "version" is not a valid mongod/mongos subcommand at all.
+        percona-server-mongodb.${tool} --version
+        ;;
+      *)
+        percona-server-mongodb.${tool} --version &>/dev/null || percona-server-mongodb.${tool} -v &>/dev/null || percona-server-mongodb.${tool} version &>/dev/null
+        ;;
+    esac
   done
 
   echo "Ensure telemetry is disabled"
