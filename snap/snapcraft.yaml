@@ -1,7 +1,7 @@
 name: percona-server-mongodb
 title: Percona Server for MongoDB
 base: core24
-version: '8.3.7-1'
+version: '8.3.8-2'
 summary: Percona Server for MongoDB server and tools in a snap.
 description: |
   Percona Server for MongoDB is a source-available, enhanced drop-in
@@ -170,12 +170,12 @@ parts:
   packages-deb:
     plugin: nil
     stage-packages:
-      - percona-server-mongodb=8.3.7-1.noble  # doc-only meta: the sole shipper of LICENSE-Community.txt.gz (SSPL disclosure)
-      - percona-server-mongodb-server=8.3.7-1.noble
-      - percona-server-mongodb-tools=8.3.7-1.noble
-      - percona-server-mongodb-mongos=8.3.7-1.noble
-      - percona-server-mongodb-shell=8.3.7-1.noble
-      - percona-mongodb-mongosh=2.9.2.noble
+      - percona-server-mongodb=8.3.8-2.noble  # doc-only meta: the sole shipper of LICENSE-Community.txt.gz (SSPL disclosure)
+      - percona-server-mongodb-server=8.3.8-2.noble
+      - percona-server-mongodb-tools=8.3.8-2.noble
+      - percona-server-mongodb-mongos=8.3.8-2.noble
+      - percona-server-mongodb-shell=8.3.8-2.noble
+      - percona-mongodb-mongosh=2.10.0.noble
       - percona-backup-mongodb=2.15.0-1.noble
       - util-linux
       - libsasl2-modules
