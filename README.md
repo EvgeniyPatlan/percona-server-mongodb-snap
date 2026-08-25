@@ -174,6 +174,72 @@ CRAFT_ARTIFACT=$(pwd)/percona-server-mongodb_<version>_amd64.snap spread -v
 (`spread` from `go install github.com/canonical/spread/cmd/spread@latest`;
 needs the `lxd` snap.)
 
+## Updating to a new Percona release
+
+`scripts/bump-version.sh` checks every exact-pinned package in
+`snap/snapcraft.yaml` against the apt indexes declared under
+`package-repositories`, and bumps any pin (and the top-level `version:`
+field, derived from the `percona-server-mongodb-server` pin) that is out
+of date.
+
+This repo declares three separate apt sources under
+`package-repositories`: the track's own PSMDB repo (`psmdb-80` on
+`8.0/edge`, `psmdb-83` on `8.3/edge`), the shared `pbm` repo that
+`percona-backup-mongodb` is pinned from, and the shared `telemetry` repo
+(needed only because `percona-server-mongodb-server` depends on
+`percona-telemetry-agent`, which is pruned from the snap and never itself
+exact-pinned). Each pinned package resolves from whichever of these three
+indexes actually contains it — the `percona-server-mongodb*` packages and
+`percona-mongodb-mongosh` from the track's PSMDB repo, `percona-backup-mongodb`
+from `pbm` — so the script behaves the same way on both branches even
+though `8.0/edge` and `8.3/edge` point at different PSMDB repo URLs.
+
+### Automated
+
+The `Update check` workflow (`.github/workflows/update-check.yaml`) runs
+weekly and, for each `*/edge` branch (`8.0/edge` and `8.3/edge`), runs the
+same script and opens a pull request per branch that has an available
+update. The PR:
+
+- touches only `snap/snapcraft.yaml`, with the pin diff as the commit;
+- contains the script's summary table (old/new version per package) in its
+  description;
+- is verified the same way any other PR is: CI (`Tests`) builds the snap for
+  `amd64` and `arm64` and runs the full spread suite against it. Merging the
+  PR into its track branch produces the downloadable `snap-packages`
+  artifact described above.
+
+To trigger an immediate check instead of waiting for the weekly run, start
+the `Update check` workflow manually from the Actions tab (`workflow_dispatch`,
+optionally scoped to one branch via the `branch` input).
+
+If a bump PR is closed without merging, its `bump/<track>-<version>` branch
+is left behind and that exact version is skipped on every future run until
+the branch is deleted (or a newer version ships) — delete the branch if you
+want the check retried for that version.
+
+### Manual
+
+```
+./scripts/bump-version.sh
+git diff
+```
+
+Review the diff, then commit and push as usual.
+
+### Scope
+
+The script only updates pins within the current track (`8.0` or `8.3`) —
+it never moves a branch from one PSMDB apt repo to another. `8.3/edge` in
+particular tracks a MongoDB *rapid* release: Percona names each rapid's
+apt repo after its release (`psmdb-83`, then `psmdb-84`, …), and that
+repo-name jump — updating the `package-repositories` URL, the version, and
+every pin to the new rapid's values — is a manual, one-time change to
+`snap/snapcraft.yaml`, not something `bump-version.sh` performs. This is
+consistent with the script's in-track-only scope; the `8.0/edge` LTS
+branch's repo name (`psmdb-80`) does not move this way. A new MongoDB
+*major* similarly means a new track/branch, set up by hand the same way.
+
 ## License
 
 The snap packaging is Apache-2.0. Upstream component licenses are shipped
