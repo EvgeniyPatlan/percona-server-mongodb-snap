@@ -12,8 +12,10 @@ prepare: |
 execute: |
   echo "Percona Server for MongoDB smoke tests"
 
-  echo "Check mongod is running and version"
-  percona-server-mongodb.mongosh --quiet --eval 'db.version()' | grep -q '8.3.'
+  echo "Check mongod is running and version (expected value derived from snapcraft.yaml)"
+  SNAP_VERSION=$(awk -F\' '/^version/{print $2}' "${SPREAD_PATH}"/snap/snapcraft.yaml)
+  MONGO_VERSION="${SNAP_VERSION%%-*}"
+  percona-server-mongodb.mongosh --quiet --eval 'db.version()' | grep -q "${MONGO_VERSION:-error}"
 
   echo "CRUD test"
   percona-server-mongodb.mongosh --quiet --eval '
